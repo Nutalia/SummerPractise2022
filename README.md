@@ -6,6 +6,8 @@ borrow(_deposit, _loan): _deposit - количество токенов BUSD, к
 
 repay(): возвращает депозит (BUSD) и забирает долг (WBNB)
 
+liquidate(borrower): ликвидация ссуды, взятой адресом borrower, и выдача награды за ликвидацию
+
 ## Тестирование (test/LendingTest.ts)
 
 В файле wallet.ts необходимо задать закрытый ключ кошелька, на котором лежат WBNB-токены (не менее 2\*сontractBalance + loan) и BUSD-токены (не менее 2\*deposit)
