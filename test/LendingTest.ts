@@ -17,6 +17,7 @@ const abi = [
 
 describe("Lending Test", async () => {
     let user: Signer //пользователь, работающий с контрактом
+    let liquidator: Signer; //ликвидатор
     let contract: Lending //тестируемый контракт
     let WBNBtoken: Contract //токен WBNB
     let BUSDtoken: Contract //токен BUSD
@@ -29,7 +30,9 @@ describe("Lending Test", async () => {
 
     before(async () => {
         //инициализация пользователя
-        user = (await ethers.getSigners() as Signer[])[0]
+        //user = (await ethers.getSigners() as Signer[])[0]
+        let others: Signer[]
+        [user, liquidator, ...others] = await ethers.getSigners()
 
         //деплой контракта, время пользования ссудой - 1 день
         contract = (await (await ethers.getContractFactory("Lending")).deploy(BUSDaddress,WBNBaddress, 24*60*60)) as Lending
@@ -81,7 +84,8 @@ describe("Lending Test", async () => {
 
         //баланс WBNB и BUSD токенов контракта изменился
         await expect(await BUSDtoken.balanceOf(contract.address)).to.equal(0)
-        await expect(await WBNBtoken.balanceOf(contract.address)).to.be.closeTo(contractBalance, 20)
+        let expectedBalance = loan*12/100 + contractBalance
+        await expect(await WBNBtoken.balanceOf(contract.address)).to.equal(expectedBalance)
     })
 
 
@@ -114,15 +118,14 @@ describe("Lending Test", async () => {
     })
 
 
-    it("trying to repay and borrow when time's up", async () => {
+    it("trying to repay, borrow and liquidate when time's up", async () => {
         //деплой контракта, время пользования ссудой - 1 секунда
         let shortContract = (await (await ethers.getContractFactory("Lending")).deploy(BUSDaddress,WBNBaddress, 1)) as Lending
         let tx = await WBNBtoken.transfer(shortContract.address, contractBalance)
         await tx.wait()
 
-        //разрешение контракту списывать BUSD токены, сразу в двойном размере
-        //чтобы не вызывать лишний раз approve
-        tx = await BUSDtoken.approve(shortContract.address, 2*deposit)
+        //разрешение контракту списывать BUSD токены
+        tx = await BUSDtoken.approve(shortContract.address, deposit)
         await tx.wait()
         
         //запрос ссуды
@@ -138,9 +141,21 @@ describe("Lending Test", async () => {
         catch(err) { message = (err as any).reason }
         await expect(message).to.include("Loan time's up")
 
-        //время истекло, поэтому можно снова запросить ссуду
-        tx = await shortContract.borrow(deposit,loan)
+        //время истекло, запросить ссуду нельзя
+        try{ await shortContract.borrow(deposit,loan) }
+        catch(err) { message = (err as any).reason }
+        await expect(message).to.include("This address already has a loan")
+
+        //нельзя ликвидировать собственную ссуду
+        try{ await shortContract.liquidate(await user.getAddress()) }
+        catch(err) { message = (err as any).reason }
+        await expect(message).to.include("You can't liquidate your own loan")
+
+        //ликвидация ссуды
+        tx = await WBNBtoken.connect(liquidator).approve(shortContract.address, loan)
         await tx.wait()
-        expect(await BUSDtoken.balanceOf(shortContract.address)).to.equal(2*deposit)
+        tx = await shortContract.connect(liquidator).liquidate(await user.getAddress())
+        await tx.wait()
+        expect(await BUSDtoken.balanceOf(shortContract.address)).to.equal(deposit - deposit/100)
     })
 })

@@ -12,6 +12,8 @@ contract Lending {
     uint ratio = 2; //во сколько раз залог должен быть больше ссуды
     Token busd; //токены залога
     Token wbnb; //токены ссуды
+    uint rate = 12; //заемщик должен вернуть долг 12%
+    uint awardForLiquidation = 1; //ликвидатор получает 1% залога
     mapping (address => uint) deposit;
     mapping (address => uint) loan;
     mapping (address => uint) time;
@@ -23,8 +25,8 @@ contract Lending {
     }
 
     function borrow(uint _deposit, uint _loan) public {
-        //либо ссуда еще не бралась (или был вызван repay), либо время пользования ссудой истекло
-        require(time[msg.sender] == 0 || block.timestamp - time[msg.sender] > loanTime, "This address already has a loan");
+        //либо ссуда еще не бралась, либо был вызван repay
+        require(time[msg.sender] == 0, "This address already has a loan");
         //нельзя запросить нулевую ссуду и ссуду, превашающую баланс контракта
         require(_loan > 0, "Zero loan");
         require(wbnb.balanceOf(address(this)) >= _loan, "Not enough tokens for loan");
@@ -46,12 +48,31 @@ contract Lending {
         require(time[msg.sender] != 0, "This address doesn't have a loan");
         uint lendingTime = block.timestamp - time[msg.sender]; //время пользования ссудой
         require(lendingTime <= loanTime, "Loan time's up");
-        uint amountOfRepay = loan[msg.sender] + loan[msg.sender]*lendingTime/(loanTime); //размер долга
+        uint amountOfRepay = loan[msg.sender] + loan[msg.sender]*rate/100; //размер долга
         require(wbnb.balanceOf(msg.sender) >= amountOfRepay, "Not enough tokens for repay");
         //возврат долга
         wbnb.transferFrom(msg.sender, address(this), amountOfRepay);
+        loan[msg.sender] = 0;
         //возврат залога
         busd.transfer( msg.sender, deposit[msg.sender]);
+        deposit[msg.sender] = 0;
+
         time[msg.sender] = 0;
+    }
+
+    function liquidate(address borrower) public {
+        require(msg.sender != borrower, "You can't liquidate your own loan");
+        require(time[borrower] != 0, "This address doesn't have a loan");
+        require(block.timestamp - time[borrower] > loanTime, "Time for using the loan hasn't expired yet");
+        require(wbnb.balanceOf(msg.sender) >= loan[borrower], "Not enough tokens for liquidation");
+        //возврат ссуды
+        wbnb.transferFrom(msg.sender, address(this), loan[borrower]);
+        loan[borrower] = 0;
+        //отправка награды
+        uint award = deposit[borrower]*awardForLiquidation/100;
+        busd.transfer(msg.sender, award);
+        deposit[borrower] = 0;
+
+        time[borrower] = 0;
     }
 }

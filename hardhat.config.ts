@@ -1,6 +1,6 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import {privateKey} from "./wallet"
+import {anotherKey, privateKey, verifyKey} from "./wallet"
 
 module.exports = {
   defaultNetwork: "testnet",
@@ -13,7 +13,7 @@ module.exports = {
     testnet: {
       url: "https://data-seed-prebsc-1-s1.binance.org:8545",
       chainId: 97,
-      accounts: [privateKey],
+      accounts: [privateKey, anotherKey],
       gasPrice: 20000000000
     },
     mainnet: {
@@ -22,6 +22,9 @@ module.exports = {
       accounts: [privateKey],
       gasPrice: 20000000000
     }
+  },
+  etherscan: {
+    apiKey: verifyKey
   },
   solidity: {
   version: "0.8.9",

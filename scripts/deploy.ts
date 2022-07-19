@@ -10,8 +10,8 @@ const abi = [ "function transfer(address to, uint amount) returns (bool)" ];
 async function main() {
   const Lending = await ethers.getContractFactory("Lending");
   const lending = await Lending.deploy("0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee" /*BUSD*/, 
-                                       "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd" /*WBNB*/,
-                                       24*60*60 /*time of loan*/);
+                                       WBNBaddress /*WBNB*/,
+                                       24*60*60 /*time of loan, 1 день*/);
 
   await lending.deployed();
 
