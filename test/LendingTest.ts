@@ -71,6 +71,15 @@ describe("Lending Test", async () => {
         expect(message).to.include("This address already has a loan")
     })
 
+    
+    //нельзя ликвидировать ссуду до истечения срока пользования
+    it("trying to liquidate loan before time's up", async () => {
+        let message = "no error"
+        try{ await contract.connect(liquidator).liquidate(await user.getAddress()) }
+        catch(err) { message = (err as any).reason }
+        expect(message).to.include("Time for using the loan hasn't expired yet")
+    })
+
 
     it("repay test", async () => {
         //разрешение контракту списывать WBNB токены, на всякий случай,
@@ -93,6 +102,14 @@ describe("Lending Test", async () => {
     it("trying to repay without having a loan", async () => {
         let message = "no error"
         try{ await contract.repay() } 
+        catch(err) { message = (err as any).reason }
+        await expect(message).to.include("This address doesn't have a loan")
+    })
+
+
+    it("trying to liquidate non-existent loan", async () => {
+        let message = "no error"
+        try{ await contract.connect(liquidator).liquidate(await user.getAddress()) } 
         catch(err) { message = (err as any).reason }
         await expect(message).to.include("This address doesn't have a loan")
     })
@@ -152,8 +169,6 @@ describe("Lending Test", async () => {
         await expect(message).to.include("You can't liquidate your own loan")
 
         //ликвидация ссуды
-        tx = await WBNBtoken.connect(liquidator).approve(shortContract.address, loan)
-        await tx.wait()
         tx = await shortContract.connect(liquidator).liquidate(await user.getAddress())
         await tx.wait()
         expect(await BUSDtoken.balanceOf(shortContract.address)).to.equal(deposit - deposit/100)

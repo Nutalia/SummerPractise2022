@@ -64,9 +64,7 @@ contract Lending {
         require(msg.sender != borrower, "You can't liquidate your own loan");
         require(time[borrower] != 0, "This address doesn't have a loan");
         require(block.timestamp - time[borrower] > loanTime, "Time for using the loan hasn't expired yet");
-        require(wbnb.balanceOf(msg.sender) >= loan[borrower], "Not enough tokens for liquidation");
-        //возврат ссуды
-        wbnb.transferFrom(msg.sender, address(this), loan[borrower]);
+        //обнуление ссуды
         loan[borrower] = 0;
         //отправка награды
         uint award = deposit[borrower]*awardForLiquidation/100;
